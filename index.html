@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Фото → PDF (пакетно, бесплатно)</title>
+<style>
+:root{--bg:#f7f5f0;--card:#fff;--ink:#222;--muted:#777;--line:#e4dfd4;--accent:#8a6d3b}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+main{max-width:920px;margin:0 auto;padding:32px 20px 60px}
+h1{font-size:24px;margin:0 0 4px;font-weight:600}
+.sub{color:var(--muted);margin:0 0 24px;font-size:14px;line-height:1.5}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+.drop{border:2px dashed #cfc6b3;border-radius:14px;padding:36px 20px;text-align:center;cursor:pointer;transition:.15s}
+.drop.over{border-color:var(--accent);background:#fbf7ee}
+.drop b{display:block;font-size:16px;margin-bottom:6px}
+.drop span{color:var(--muted);font-size:13px}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.between{justify-content:space-between}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+select{padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:14px;color:var(--ink)}
+button{font:inherit;font-size:14px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;padding:8px 14px;cursor:pointer}
+button:hover{border-color:#bbb}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;padding:10px 18px}
+button:disabled{opacity:.5;cursor:default}
+button.small{padding:4px 9px}
+.list{display:grid;gap:8px;margin-top:14px}
+.item{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+.item img{width:56px;height:56px;object-fit:cover;border-radius:6px;background:#eee;flex:none}
+.item .info{flex:1;min-width:0}
+.item .name{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .meta{font-size:12px;color:var(--muted)}
+.item .num{width:44px;color:var(--muted);font-size:13px;text-align:right;flex:none}
+.item .acts{display:flex;gap:4px;flex:none}
+.bar{height:10px;background:#ebe6da;border-radius:6px;overflow:hidden;margin-top:14px}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+.status{font-size:14px;color:var(--muted);margin-top:10px;min-height:20px;line-height:1.5}
+.hint{font-size:12px;color:var(--muted);margin:14px 0 0;line-height:1.6}
+.count{font-size:14px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Фото → PDF</h1>
+  <p class="sub">Конвертация сотен фотографий за один раз. Всё происходит в вашем браузере: файлы никуда не отправляются, без регистрации и платы.</p>
+
+  <div class="card">
+    <div id="drop" class="drop">
+      <b>Перетащите фото сюда</b>
+      <span>или нажмите, чтобы выбрать сразу много файлов (JPG, PNG, WebP, GIF, BMP)</span>
+      <input id="file" type="file" accept="image/*" multiple hidden>
+    </div>
+
+    <div class="row between" style="margin-top:14px">
+      <span class="count" id="count">Файлов нет</span>
+      <div class="row">
+        <button id="sortBtn">Сортировать по имени</button>
+        <button id="clearBtn">Очистить</button>
+      </div>
+    </div>
+    <div id="list" class="list"></div>
+  </div>
+
+  <div class="card">
+    <div class="opts">
+      <label>Режим
+        <select id="mode">
+          <option value="one">PDF из нескольких фото</option>
+          <option value="each">Отдельный PDF на каждое фото</option>
+        </select>
+      </label>
+      <label>Страниц в одном файле
+        <select id="perFile">
+          <option value="0">Все в одном файле</option>
+          <option value="100">По 100</option>
+          <option value="200" selected>По 200</option>
+          <option value="500">По 500</option>
+        </select>
+      </label>
+      <label>Размер страницы
+        <select id="pageSize">
+          <option value="a4">A4 (ориентация по фото)</option>
+          <option value="original">Как у самого фото</option>
+        </select>
+      </label>
+      <label>Поля
+        <select id="margin">
+          <option value="0">Без полей</option>
+          <option value="20" selected>Небольшие (~7 мм)</option>
+          <option value="40">Большие (~14 мм)</option>
+        </select>
+      </label>
+      <label>Макс. сторона фото
+        <select id="maxSide">
+          <option value="1200">1200 px (самый маленький файл)</option>
+          <option value="2000" selected>2000 px (оптимально для печати и экрана)</option>
+          <option value="3000">3000 px</option>
+          <option value="4096">4096 px (почти оригинал)</option>
+        </select>
+      </label>
+      <label>Качество JPEG
+        <select id="quality">
+          <option value="0.7">Меньший файл</option>
+          <option value="0.8" selected>Оптимально</option>
+          <option value="0.92">Максимум</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="row between" style="margin-top:16px">
+      <button id="go" class="primary" disabled>Конвертировать в PDF</button>
+      <span class="count" id="total"></span>
+    </div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="status" id="status"></div>
+    <p class="hint">
+      Фото с iPhone в формате HEIC браузеры обычно не открывают. Чтобы их конвертировать, включите в настройках камеры «Наиболее совместимые» (Настройки → Камера → Форматы) или сохраняйте фото в JPG. Для 1000 снимков разумнее «По 200» и 2000 px: тогда каждый файл весит десятки мегабайт, а не гигабайты. Части скачиваются по мере готовности, поэтому память не забивается. Браузер может один раз спросить разрешение на несколько загрузок — нажмите «Разрешить».
+    </p>
+  </div>
+</main>
+
+<!-- Ядро: сборка PDF без внешних библиотек -->
+<script id="pdf-core">
+// Размеры страниц A4 в пунктах (1 pt = 1/72 дюйма)
+const A4_W = 595.28, A4_H = 841.89;
+
+// Расчёт страницы и положения картинки на ней
+function layout(w, h, mode, marginPt) {
+  if (mode === 'original') {
+    // 96 dpi -> 72 pt: 1 px = 0.75 pt
+    const pw = w * 0.75, ph = h * 0.75;
+    return { pw, ph, dw: pw, dh: ph, x: 0, y: 0 };
+  }
+  const landscape = w > h;
+  const pw = landscape ? A4_H : A4_W;
+  const ph = landscape ? A4_W : A4_H;
+  const s = Math.min((pw - 2 * marginPt) / w, (ph - 2 * marginPt) / h);
+  const dw = w * s, dh = h * s;
+  return { pw, ph, dw, dh, x: (pw - dw) / 2, y: (ph - dh) / 2 };
+}
+
+// Размер данных: у Blob это size, у Uint8Array — length
+const sizeOf = (d) => (d instanceof Blob ? d.size : d.length);
+
+// Сборка PDF из JPEG-страниц. pages: [{ jpeg: Blob|Uint8Array, w, h, pw, ph, dw, dh, x, y }]
+// JPEG вкладывается как есть (DCTDecode), поэтому повторного сжатия нет.
+function buildPdf(pages) {
+  const enc = new TextEncoder();
+  const chunks = [];
+  const offsets = [];
+  let offset = 0;
+
+  const push = (data) => { chunks.push(data); offset += sizeOf(data); };
+  const str = (s) => push(enc.encode(s));
+  const begin = (num) => { offsets[num] = offset; str(num + ' 0 obj\n'); };
+  const end = () => str('endobj\n');
+
+  const n = pages.length;
+  const total = 2 + 3 * n;
+
+  str('%PDF-1.4\n%âãÏÓ\n');
+
+  begin(1);
+  str('<< /Type /Catalog /Pages 2 0 R >>\n');
+  end();
+
+  begin(2);
+  const kids = pages.map((_, i) => (3 + i * 3 + 2) + ' 0 R').join(' ');
+  str('<< /Type /Pages /Kids [' + kids + '] /Count ' + n + ' >>\n');
+  end();
+
+  pages.forEach((p, i) => {
+    const imgN = 3 + i * 3, cntN = imgN + 1, pgN = imgN + 2;
+
+    begin(imgN);
+    str('<< /Type /XObject /Subtype /Image /Width ' + p.w + ' /Height ' + p.h +
+        ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' +
+        sizeOf(p.jpeg) + ' >>\nstream\n');
+    push(p.jpeg);
+    str('\nendstream\n');
+    end();
+
+    const content =
+      'q ' + p.dw.toFixed(2) + ' 0 0 ' + p.dh.toFixed(2) + ' ' +
+      p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ' cm /Im' + i + ' Do Q';
+    begin(cntN);
+    str('<< /Length ' + content.length + ' >>\nstream\n' + content + '\nendstream\n');
+    end();
+
+    begin(pgN);
+    str('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + p.pw.toFixed(2) + ' ' + p.ph.toFixed(2) +
+        '] /Resources << /XObject << /Im' + i + ' ' + imgN + ' 0 R >> >> /Contents ' + cntN + ' 0 R >>\n');
+    end();
+  });
+
+  const xrefOffset = offset;
+  let xref = 'xref\n0 ' + (total + 1) + '\n0000000000 65535 f \n';
+  for (let k = 1; k <= total; k++) {
+    xref += String(offsets[k]).padStart(10, '0') + ' 00000 n \n';
+  }
+  str(xref);
+  str('trailer\n<< /Size ' + (total + 1) + ' /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF\n');
+
+  return new Blob(chunks, { type: 'application/pdf' });
+}
+</script>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let items = [];        // {file, url, name}
+let busy = false;
+
+// ----- Добавление файлов -----
+const drop = $('drop');
+const input = $('file');
+drop.addEventListener('click', () => input.click());
+input.addEventListener('change', (e) => { addFiles(e.target.files); input.value = ''; });
+['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => {
+  e.preventDefault(); drop.classList.add('over');
+}));
+['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (e) => {
+  e.preventDefault(); drop.classList.remove('over');
+}));
+drop.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
+// Чтобы файл, брошенный мимо зоны, не открывался вместо страницы
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => e.preventDefault());
+
+function addFiles(fileList) {
+  if (busy) return;
+  const all = [...fileList];
+  const imgs = all.filter((f) => f.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif)$/i.test(f.name));
+  for (const f of imgs) items.push({ file: f, url: URL.createObjectURL(f), name: f.name });
+  render();
+  const skipped = all.length - imgs.length;
+  if (skipped) setStatus('Пропущено не-изображений: ' + skipped);
+}
+
+// ----- Список -----
+function render() {
+  const list = $('list');
+  list.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  items.forEach((it, i) => {
+    const row = document.createElement('div');
+    row.className = 'item';
+    row.innerHTML =
+      '<span class="num">' + (i + 1) + '</span>' +
+      '<img src="' + it.url + '" alt="" loading="lazy" decoding="async">' +
+      '<div class="info"><div class="name"></div><div class="meta">' +
+        (it.file.size / 1048576).toFixed(2) + ' МБ</div></div>' +
+      '<div class="acts">' +
+        '<button class="small" data-a="up" title="Выше">↑</button>' +
+        '<button class="small" data-a="down" title="Ниже">↓</button>' +
+        '<button class="small" data-a="del" title="Убрать">✕</button>' +
+      '</div>';
+    row.querySelector('.name').textContent = it.name;
+    row.querySelectorAll('button').forEach((b) => {
+      b.addEventListener('click', () => act(i, b.dataset.a));
+    });
+    frag.appendChild(row);
+  });
+  list.appendChild(frag);
+  const mb = items.reduce((s, x) => s + x.file.size, 0) / 1048576;
+  $('count').textContent = items.length ? 'Файлов: ' + items.length + ' · ' + mb.toFixed(1) + ' МБ' : 'Файлов нет';
+  $('total').textContent = items.length ? 'Фото: ' + items.length : '';
+  $('go').disabled = !items.length || busy;
+}
+
+function act(i, a) {
+  if (busy) return;
+  if (a === 'del') { URL.revokeObjectURL(items[i].url); items.splice(i, 1); }
+  if (a === 'up' && i > 0) [items[i - 1], items[i]] = [items[i], items[i - 1]];
+  if (a === 'down' && i < items.length - 1) [items[i + 1], items[i]] = [items[i], items[i + 1]];
+  render();
+}
+
+$('sortBtn').addEventListener('click', () => {
+  if (busy) return;
+  items.sort((a, b) => a.name.localeCompare(b.name, 'ru', { numeric: true }));
+  render();
+});
+
+$('clearBtn').addEventListener('click', () => {
+  if (busy) return;
+  items.forEach((x) => URL.revokeObjectURL(x.url));
+  items = [];
+  $('bar').style.width = '0%';
+  setStatus('');
+  render();
+});
+
+// ----- Конвертация -----
+function setStatus(t) { $('status').textContent = t; }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function loadImage(url) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = () => rej(new Error('формат не открывается браузером'));
+    img.src = url;
+  });
+}
+
+// Декодируем фото, уменьшаем до maxSide и кодируем в JPEG на белом фоне.
+// Результат — Blob, чтобы браузер мог держать его на диске, а не в оперативной памяти.
+async function toJpeg(it, maxSide, quality) {
+  const img = await loadImage(it.url);
+  let w = img.naturalWidth, h = img.naturalHeight;
+  if (!w || !h) throw new Error('пустое изображение');
+  const k = Math.min(1, maxSide / Math.max(w, h));
+  w = Math.round(w * k); h = Math.round(h * k);
+
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', quality));
+  c.width = c.height = 0; // освобождаем память канваса
+  if (!blob) throw new Error('не удалось закодировать JPEG');
+  return { jpeg: blob, w, h };
+}
+
+function download(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 6000);
+}
+
+const stamp = () => new Date().toISOString().slice(0, 10);
+const baseName = (n) => n.replace(/\.[^.]+$/, '');
+const pad = (n, len = 3) => String(n).padStart(len, '0');
+
+$('go').addEventListener('click', run);
+
+async function run() {
+  if (busy || !items.length) return;
+  busy = true;
+  render();
+  $('bar').style.width = '0%';
+
+  const mode = $('mode').value;
+  const perFile = +$('perFile').value;   // 0 = все страницы в одном файле
+  const ps = $('pageSize').value;
+  const marginPt = +$('margin').value;
+  const maxSide = +$('maxSide').value;
+  const quality = +$('quality').value;
+
+  const errors = [];
+  const total = items.length;
+  let pages = [];   // страницы текущей части (режим «несколько фото»)
+  let partNo = 0;
+  let made = 0;
+  const day = stamp();
+
+  const flushPart = () => {
+    if (!pages.length) return;
+    partNo++;
+    const suffix = perFile ? '_part' + pad(partNo, 2) : '';
+    download(buildPdf(pages), 'photos-' + day + suffix + '.pdf');
+    made++;
+    pages = []; // отпускаем страницы предыдущей части
+  };
+
+  for (let i = 0; i < total; i++) {
+    const it = items[i];
+    setStatus('Обработка ' + (i + 1) + ' из ' + total + ': ' + it.name);
+    try {
+      const j = await toJpeg(it, maxSide, quality);
+      const page = Object.assign({ jpeg: j.jpeg, w: j.w, h: j.h }, layout(j.w, j.h, ps, marginPt));
+      if (mode === 'one') {
+        pages.push(page);
+        if (perFile && pages.length >= perFile) { flushPart(); await sleep(300); }
+      } else {
+        download(buildPdf([page]), pad(i + 1) + '_' + baseName(it.name) + '.pdf');
+        made++;
+        await sleep(300); // браузеры блокируют слишком частые загрузки
+      }
+    } catch (e) {
+      errors.push(it.name + ' (' + e.message + ')');
+    }
+    $('bar').style.width = ((i + 1) / total * 100).toFixed(1) + '%';
+    await sleep(0); // даём браузеру перерисовать интерфейс
+  }
+
+  if (mode === 'one') {
+    flushPart();
+  }
+
+  let msg = 'Готово: ' + (mode === 'one' ? 'PDF-файлов' : 'PDF-файлов') + ': ' + made + '.';
+  if (errors.length) {
+    const shown = errors.slice(0, 5).join('; ');
+    msg += ' Не обработано: ' + errors.length + (errors.length > 5 ? ' (первые: ' : ' (') + shown + ').';
+  }
+  setStatus(msg);
+
+  busy = false;
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
